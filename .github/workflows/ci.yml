@@ -69,7 +69,9 @@ jobs:
 
   code-review:
     needs: ci-status
-    if: success() && github.event.pull_request.draft == false
+    if: >
+      success() && github.event.pull_request.draft == false &&
+      contains(fromJSON('["OWNER","COLLABORATOR","MEMBER"]'), github.event.pull_request.author_association)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -84,7 +86,7 @@ jobs:
       - name: Run Claude Code Review
         uses: anthropics/claude-code-action@v1
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.CLAUDE_API_KEY }}
           track_progress: true
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
@@ -136,7 +138,9 @@ jobs:
 
   security-review:
     needs: ci-status
-    if: success() && github.event.pull_request.draft == false
+    if: >
+      success() && github.event.pull_request.draft == false &&
+      contains(fromJSON('["OWNER","COLLABORATOR","MEMBER"]'), github.event.pull_request.author_association)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -151,7 +155,7 @@ jobs:
       - name: Run Claude Security Review
         uses: anthropics/claude-code-action@v1
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.CLAUDE_API_KEY }}
           track_progress: true
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
