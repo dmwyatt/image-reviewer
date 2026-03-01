@@ -4,9 +4,9 @@ Human-in-the-loop image review for AI coding agents. When an agent like [Claude 
 
 The agent gets a clear signal back: exit code `0` (accept) or `1` (reject), plus the path to your annotated image on stdout. No copy-pasting descriptions of what's wrong — just circle it.
 
-![Review UI — image loaded for review with toolbar, color palette, and accept/reject controls](https://bloopityseven.fly.dev/dc291fae-2da3-412e-8c45-abc315a9b960.png)
+![Review UI — an AI-generated landing page loaded for review with annotation toolbar, color palette, and accept/reject controls](https://bloopityseven.fly.dev/9b450e6e-b674-4ac3-b00b-3409a15ef3dc.png)
 
-![Annotation tools in action — rectangle, arrow, and text annotations on an image](https://bloopityseven.fly.dev/e78e537f-82fe-4f52-bc43-4f1bd87b56ce.png)
+![Annotation tools in action — rectangle and arrow annotations highlighting a misaligned CTA button](https://bloopityseven.fly.dev/5352a355-b21e-4d0c-b03b-08e1cdb221c7.png)
 
 ### How it fits into an agent workflow
 
