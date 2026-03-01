@@ -1,0 +1,27 @@
+[project]
+name = "image-reviewer"
+version = "0.1.0"
+description = "Image review and annotation tool with native window or browser UI"
+readme = "README.md"
+authors = [
+    { name = "Dustin Wyatt", email = "dustin.wyatt@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "pygobject>=3.56.0",
+    "pywebview>=6.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.10.4,<0.11.0"]
+build-backend = "uv_build"
+
+[project.scripts]
+image-reviewer = "image_reviewer.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-playwright>=0.7.2",
+    "radon>=6.0.1",
+]

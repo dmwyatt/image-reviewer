@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image Reviewer</title>
+<script src="/fabric.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    background: #1e1e1e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 13px;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+}
+
+#toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: #2d2d2d;
+    border-bottom: 1px solid #404040;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.toolbar-separator {
+    width: 1px;
+    height: 24px;
+    background: #404040;
+    margin: 0 4px;
+}
+
+.tool-btn {
+    padding: 4px 10px;
+    background: #383838;
+    border: 1px solid #505050;
+    border-radius: 4px;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.tool-btn:hover { background: #454545; }
+.tool-btn.active { background: #0078d4; border-color: #0078d4; color: #fff; }
+
+.color-swatch {
+    width: 22px;
+    height: 22px;
+    border-radius: 3px;
+    border: 2px solid transparent;
+    cursor: pointer;
+}
+
+.color-swatch:hover { border-color: #888; }
+.color-swatch.active { border-color: #fff; }
+
+.thickness-btn {
+    width: 28px;
+    height: 22px;
+    background: #383838;
+    border: 1px solid #505050;
+    border-radius: 3px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.thickness-btn:hover { background: #454545; }
+.thickness-btn.active { background: #0078d4; border-color: #0078d4; }
+
+.thickness-line {
+    background: #ccc;
+    border-radius: 1px;
+    width: 16px;
+}
+
+#canvas-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+#canvas-container canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+#statusbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 12px;
+    background: #2d2d2d;
+    border-top: 1px solid #404040;
+    flex-shrink: 0;
+    font-size: 12px;
+}
+
+.action-btn {
+    padding: 5px 16px;
+    border: 1px solid #505050;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.btn-accept {
+    background: #2ea043;
+    border-color: #2ea043;
+    color: #fff;
+}
+.btn-accept:hover { background: #3fb950; }
+
+.btn-reject {
+    background: #da3633;
+    border-color: #da3633;
+    color: #fff;
+}
+.btn-reject:hover { background: #f85149; }
+
+#zoom-display {
+    color: #999;
+    min-width: 60px;
+    text-align: center;
+}
+
+.status-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.shortcut-hint {
+    color: #666;
+    font-size: 11px;
+}
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+    <div class="toolbar-group" id="tools">
+        <button class="tool-btn active" data-tool="select" title="Select / Move (V)">Select</button>
+        <button class="tool-btn" data-tool="draw" title="Freehand Draw (D)">Draw</button>
+        <button class="tool-btn" data-tool="rectangle" title="Rectangle (R)">Rect</button>
+        <button class="tool-btn" data-tool="arrow" title="Arrow (A)">Arrow</button>
+        <button class="tool-btn" data-tool="text" title="Text (T)">Text</button>
+    </div>
+
+    <div class="toolbar-separator"></div>
+
+    <div class="toolbar-group" id="colors"></div>
+
+    <div class="toolbar-separator"></div>
+
+    <div class="toolbar-group" id="thicknesses"></div>
+
+    <div class="toolbar-separator"></div>
+
+    <div class="toolbar-group">
+        <button class="tool-btn" id="btn-undo" title="Undo (Ctrl+Z)">Undo</button>
+        <button class="tool-btn" id="btn-delete" title="Delete Selected (Del)">Delete</button>
+    </div>
+
+    <div class="toolbar-separator"></div>
+
+    <div class="toolbar-group">
+        <button class="tool-btn" id="btn-fit" title="Zoom to Fit (F)">Fit</button>
+        <button class="tool-btn" id="btn-actual" title="Actual Size (1)">100%</button>
+    </div>
+</div>
+
+<div id="canvas-container">
+    <canvas id="canvas"></canvas>
+</div>
+
+<div id="statusbar">
+    <div class="status-group">
+        <button class="action-btn btn-reject" id="btn-reject" title="Reject (Escape)">Reject</button>
+        <span class="shortcut-hint">Esc</span>
+    </div>
+    <div class="status-group">
+        <span id="zoom-display">100%</span>
+    </div>
+    <div class="status-group">
+        <button class="action-btn btn-accept" id="btn-accept" title="Accept (Enter)">Accept</button>
+        <span class="shortcut-hint">Enter</span>
+    </div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+
+    // ── Constants ──
+    const IMAGE_DATA_URL = "__IMAGE_DATA_URL__";
+    const COLORS = ['#ff3b30', '#ff9500', '#ffcc00', '#34c759', '#007aff', '#af52de', '#ffffff', '#000000'];
+    const THICKNESSES = [2, 4, 8];
+    const MAX_UNDO = 50;
+
+    // ── State ──
+    const state = {
+        activeTool: 'select',
+        activeColor: COLORS[0],
+        activeThickness: THICKNESSES[1],
+        isPanning: false,
+        spaceDown: false,
+        lastPanPoint: null,
+        undoStack: [],
+        isRestoring: false,
+        drawingRect: null,
+        rectStartPoint: null,
+        drawingArrow: null,
+        arrowStartPoint: null,
+        imageWidth: 0,
+        imageHeight: 0,
+        hasAnnotations: false,
+    };
+
+    // ── Canvas Setup ──
+    const container = document.getElementById('canvas-container');
+    const canvas = new fabric.Canvas('canvas', {
+        selection: true,
+        preserveObjectStacking: true,
+    });
+
+    function resizeCanvas() {
+        canvas.setWidth(container.clientWidth);
+        canvas.setHeight(container.clientHeight);
+        canvas.renderAll();
+    }
+
+    function loadBackgroundImage() {
+        fabric.Image.fromURL(IMAGE_DATA_URL, function(img) {
+            state.imageWidth = img.width;
+            state.imageHeight = img.height;
+            img.set({
+                selectable: false,
+                evented: false,
+                hasControls: false,
+                hasBorders: false,
+                lockMovementX: true,
+                lockMovementY: true,
+                objectCaching: false,
+            });
+            canvas.insertAt(img, 0);
+            zoomToFit();
+            pushUndo();
+        });
+    }
+
+    // ── Zoom & Pan ──
+    function zoomToFit() {
+        if (!state.imageWidth || !state.imageHeight) return;
+        const cw = container.clientWidth;
+        const ch = container.clientHeight;
+        const scale = Math.min(cw / state.imageWidth, ch / state.imageHeight, 1);
+        canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+        canvas.zoomToPoint(new fabric.Point(0, 0), scale);
+        const offsetX = (cw - state.imageWidth * scale) / 2;
+        const offsetY = (ch - state.imageHeight * scale) / 2;
+        canvas.setViewportTransform([scale, 0, 0, scale, offsetX, offsetY]);
+        canvas.renderAll();
+        updateZoomDisplay();
+    }
+
+    function zoomToActual() {
+        const cw = container.clientWidth;
+        const ch = container.clientHeight;
+        const offsetX = (cw - state.imageWidth) / 2;
+        const offsetY = (ch - state.imageHeight) / 2;
+        canvas.setViewportTransform([1, 0, 0, 1, offsetX, offsetY]);
+        canvas.renderAll();
+        updateZoomDisplay();
+    }
+
+    function updateZoomDisplay() {
+        const zoom = canvas.getZoom();
+        document.getElementById('zoom-display').textContent = Math.round(zoom * 100) + '%';
+    }
+
+    canvas.on('mouse:wheel', function(opt) {
+        const delta = opt.e.deltaY;
+        let zoom = canvas.getZoom();
+        zoom *= 0.999 ** delta;
+        zoom = Math.max(0.05, Math.min(20, zoom));
+        canvas.zoomToPoint(new fabric.Point(opt.e.offsetX, opt.e.offsetY), zoom);
+        opt.e.preventDefault();
+        opt.e.stopPropagation();
+        updateZoomDisplay();
+    });
+
+    // ── Pan with Space ──
+    function startPan(e) {
+        state.isPanning = true;
+        state.lastPanPoint = { x: e.clientX, y: e.clientY };
+        container.style.cursor = 'grabbing';
+    }
+
+    function doPan(e) {
+        if (!state.isPanning || !state.lastPanPoint) return;
+        const dx = e.clientX - state.lastPanPoint.x;
+        const dy = e.clientY - state.lastPanPoint.y;
+        canvas.relativePan(new fabric.Point(dx, dy));
+        state.lastPanPoint = { x: e.clientX, y: e.clientY };
+    }
+
+    function endPan() {
+        state.isPanning = false;
+        state.lastPanPoint = null;
+        updateCursor();
+    }
+
+    // ── Tool Management ──
+    function setActiveTool(tool) {
+        state.activeTool = tool;
+        document.querySelectorAll('#tools .tool-btn').forEach(function(btn) {
+            btn.classList.toggle('active', btn.dataset.tool === tool);
+        });
+        canvas.isDrawingMode = (tool === 'draw');
+        canvas.selection = (tool === 'select');
+        if (tool === 'draw') {
+            canvas.freeDrawingBrush.color = state.activeColor;
+            canvas.freeDrawingBrush.width = state.activeThickness;
+        }
+        canvas.forEachObject(function(obj) {
+            if (obj === canvas.item(0)) return; // background image
+            obj.selectable = (tool === 'select');
+            obj.evented = (tool === 'select');
+        });
+        if (tool !== 'select') {
+            canvas.discardActiveObject();
+            canvas.renderAll();
+        }
+        updateCursor();
+    }
+
+    function updateCursor() {
+        if (state.spaceDown) {
+            container.style.cursor = state.isPanning ? 'grabbing' : 'grab';
+            return;
+        }
+        switch (state.activeTool) {
+            case 'select': container.style.cursor = 'default'; break;
+            case 'draw': container.style.cursor = 'crosshair'; break;
+            case 'rectangle': container.style.cursor = 'crosshair'; break;
+            case 'arrow': container.style.cursor = 'crosshair'; break;
+            case 'text': container.style.cursor = 'text'; break;
+            default: container.style.cursor = 'default';
+        }
+    }
+
+    // ── Rectangle Tool ──
+    canvas.on('mouse:down', function(opt) {
+        if (state.spaceDown) {
+            startPan(opt.e);
+            return;
+        }
+        if (state.activeTool === 'rectangle') {
+            const pointer = canvas.getPointer(opt.e);
+            state.rectStartPoint = pointer;
+            state.drawingRect = new fabric.Rect({
+                left: pointer.x,
+                top: pointer.y,
+                width: 0,
+                height: 0,
+                fill: 'transparent',
+                stroke: state.activeColor,
+                strokeWidth: state.activeThickness,
+                selectable: false,
+                evented: false,
+            });
+            canvas.add(state.drawingRect);
+        } else if (state.activeTool === 'arrow') {
+            const pointer = canvas.getPointer(opt.e);
+            state.arrowStartPoint = pointer;
+            state.drawingArrow = createArrow(pointer.x, pointer.y, pointer.x, pointer.y);
+            canvas.add(state.drawingArrow);
+        } else if (state.activeTool === 'text') {
+            const pointer = canvas.getPointer(opt.e);
+            if (opt.target && opt.target.type === 'i-text') return;
+            const text = new fabric.IText('Text', {
+                left: pointer.x,
+                top: pointer.y,
+                fontFamily: 'Arial',
+                fontSize: 16 + state.activeThickness * 2,
+                fill: state.activeColor,
+                selectable: true,
+                evented: true,
+            });
+            canvas.add(text);
+            canvas.setActiveObject(text);
+            text.enterEditing();
+            text.selectAll();
+            state.hasAnnotations = true;
+            pushUndo();
+        }
+    });
+
+    canvas.on('mouse:move', function(opt) {
+        if (state.isPanning) {
+            doPan(opt.e);
+            return;
+        }
+        if (state.activeTool === 'rectangle' && state.drawingRect && state.rectStartPoint) {
+            const pointer = canvas.getPointer(opt.e);
+            const left = Math.min(state.rectStartPoint.x, pointer.x);
+            const top = Math.min(state.rectStartPoint.y, pointer.y);
+            const width = Math.abs(pointer.x - state.rectStartPoint.x);
+            const height = Math.abs(pointer.y - state.rectStartPoint.y);
+            state.drawingRect.set({ left: left, top: top, width: width, height: height });
+            canvas.renderAll();
+        } else if (state.activeTool === 'arrow' && state.drawingArrow && state.arrowStartPoint) {
+            const pointer = canvas.getPointer(opt.e);
+            state.drawingArrow.set({ x2: pointer.x, y2: pointer.y });
+            state.drawingArrow.setCoords();
+            canvas.renderAll();
+        }
+    });
+
+    canvas.on('mouse:up', function(opt) {
+        if (state.isPanning) {
+            endPan();
+            return;
+        }
+        if (state.activeTool === 'rectangle' && state.drawingRect) {
+            if (state.drawingRect.width < 3 && state.drawingRect.height < 3) {
+                canvas.remove(state.drawingRect);
+            } else {
+                state.hasAnnotations = true;
+                pushUndo();
+            }
+            state.drawingRect = null;
+            state.rectStartPoint = null;
+        } else if (state.activeTool === 'arrow' && state.drawingArrow) {
+            const dx = state.drawingArrow.x2 - state.drawingArrow.x1;
+            const dy = state.drawingArrow.y2 - state.drawingArrow.y1;
+            if (Math.sqrt(dx * dx + dy * dy) < 5) {
+                canvas.remove(state.drawingArrow);
+            } else {
+                state.hasAnnotations = true;
+                pushUndo();
+            }
+            state.drawingArrow = null;
+            state.arrowStartPoint = null;
+        }
+    });
+
+    // ── Freehand draw end ──
+    canvas.on('path:created', function() {
+        state.hasAnnotations = true;
+        pushUndo();
+    });
+
+    // ── Arrow Tool ──
+    function createArrow(x1, y1, x2, y2) {
+        const line = new fabric.Line([x1, y1, x2, y2], {
+            stroke: state.activeColor,
+            strokeWidth: state.activeThickness,
+            selectable: false,
+            evented: false,
+            objectCaching: false,
+        });
+        line.isArrow = true;
+        line._arrowColor = state.activeColor;
+        line._arrowWidth = state.activeThickness;
+        return line;
+    }
+
+    // Custom arrow rendering
+    canvas.on('after:render', function() {
+        const ctx = canvas.getContext('2d');
+        canvas.forEachObject(function(obj) {
+            if (!obj.isArrow) return;
+            const zoom = canvas.getZoom();
+            const vpt = canvas.viewportTransform;
+            const p1 = fabric.util.transformPoint(
+                new fabric.Point(obj.x1, obj.y1), vpt
+            );
+            const p2 = fabric.util.transformPoint(
+                new fabric.Point(obj.x2, obj.y2), vpt
+            );
+            const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+            const headLen = Math.max(10, obj._arrowWidth * 3) * Math.min(zoom, 2);
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(p2.x - headLen * Math.cos(angle - Math.PI / 6),
+                       p2.y - headLen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(p2.x, p2.y);
+            ctx.lineTo(p2.x - headLen * Math.cos(angle + Math.PI / 6),
+                       p2.y - headLen * Math.sin(angle + Math.PI / 6));
+            ctx.strokeStyle = obj._arrowColor;
+            ctx.lineWidth = obj._arrowWidth * zoom;
+            ctx.stroke();
+            ctx.restore();
+        });
+    });
+
+    // ── Undo System ──
+    function pushUndo() {
+        if (state.isRestoring) return;
+        const json = canvas.toJSON(['isArrow', '_arrowColor', '_arrowWidth',
+            'selectable', 'evented', 'hasControls', 'hasBorders',
+            'lockMovementX', 'lockMovementY']);
+        state.undoStack.push(JSON.stringify(json));
+        if (state.undoStack.length > MAX_UNDO) {
+            state.undoStack.shift();
+        }
+    }
+
+    function undo() {
+        if (state.undoStack.length <= 1) return;
+        state.undoStack.pop(); // remove current state
+        const prev = state.undoStack[state.undoStack.length - 1];
+        state.isRestoring = true;
+        canvas.loadFromJSON(JSON.parse(prev), function() {
+            state.isRestoring = false;
+            canvas.renderAll();
+        });
+    }
+
+    // Track object modifications
+    canvas.on('object:modified', function() {
+        pushUndo();
+    });
+
+    // ── Color & Thickness ──
+    function initColors() {
+        const container = document.getElementById('colors');
+        COLORS.forEach(function(color) {
+            const swatch = document.createElement('div');
+            swatch.className = 'color-swatch' + (color === state.activeColor ? ' active' : '');
+            swatch.style.background = color;
+            if (color === '#000000') {
+                swatch.style.border = '2px solid #555';
+            }
+            swatch.dataset.color = color;
+            swatch.addEventListener('click', function() {
+                state.activeColor = color;
+                document.querySelectorAll('.color-swatch').forEach(function(s) {
+                    s.classList.toggle('active', s.dataset.color === color);
+                });
+                if (canvas.isDrawingMode) {
+                    canvas.freeDrawingBrush.color = color;
+                }
+            });
+            container.appendChild(swatch);
+        });
+    }
+
+    function initThicknesses() {
+        const container = document.getElementById('thicknesses');
+        THICKNESSES.forEach(function(t) {
+            const btn = document.createElement('div');
+            btn.className = 'thickness-btn' + (t === state.activeThickness ? ' active' : '');
+            btn.dataset.thickness = t;
+            const line = document.createElement('div');
+            line.className = 'thickness-line';
+            line.style.height = Math.max(1, t) + 'px';
+            btn.appendChild(line);
+            btn.addEventListener('click', function() {
+                state.activeThickness = t;
+                document.querySelectorAll('.thickness-btn').forEach(function(b) {
+                    b.classList.toggle('active', parseInt(b.dataset.thickness) === t);
+                });
+                if (canvas.isDrawingMode) {
+                    canvas.freeDrawingBrush.width = t;
+                }
+            });
+            container.appendChild(btn);
+        });
+    }
+
+    // ── Actions ──
+    // Use pywebview JS bridge when in native mode, fetch for --serve mode
+    function hasPyWebView() {
+        return !!(window.pywebview && window.pywebview.api);
+    }
+
+    function hasAnnotations() {
+        return canvas.getObjects().length > 1;
+    }
+
+    function exportCanvasData() {
+        var vpt = canvas.viewportTransform.slice();
+        canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+        canvas.renderAll();
+
+        var dataURL = canvas.toDataURL({
+            format: 'png',
+            width: state.imageWidth,
+            height: state.imageHeight,
+            left: 0,
+            top: 0,
+        });
+
+        canvas.setViewportTransform(vpt);
+        canvas.renderAll();
+        return dataURL;
+    }
+
+    function doAction(action) {
+        var imageData = hasAnnotations() ? exportCanvasData() : null;
+
+        if (hasPyWebView()) {
+            window.pywebview.api[action](imageData);
+        } else {
+            var options = { method: 'POST' };
+            if (imageData) {
+                options.headers = { 'Content-Type': 'application/json' };
+                options.body = JSON.stringify({ image: imageData });
+            }
+            fetch('/api/' + action, options)
+                .then(function() { try { window.close(); } catch(e) {} })
+                .catch(function(err) { console.error(action + ' failed:', err); });
+        }
+    }
+
+    function doAccept() { doAction('accept'); }
+    function doReject() { doAction('reject'); }
+
+    // ── Keyboard Shortcuts ──
+    function isEditingText() {
+        const active = canvas.getActiveObject();
+        return active && active.type === 'i-text' && active.isEditing;
+    }
+
+    document.addEventListener('keydown', function(e) {
+        if (isEditingText()) {
+            if (e.key === 'Escape') {
+                canvas.getActiveObject().exitEditing();
+                canvas.discardActiveObject();
+                canvas.renderAll();
+            }
+            return;
+        }
+
+        if (e.key === 'Escape') {
+            doReject();
+        } else if (e.key === 'Enter') {
+            doAccept();
+        } else if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            undo();
+        } else if (e.key === ' ' && !state.spaceDown) {
+            e.preventDefault();
+            state.spaceDown = true;
+            canvas.isDrawingMode = false;
+            canvas.selection = false;
+            updateCursor();
+        } else if (e.key === 'Delete' || e.key === 'Backspace') {
+            const active = canvas.getActiveObject();
+            if (active && active !== canvas.item(0)) {
+                canvas.remove(active);
+                canvas.renderAll();
+                pushUndo();
+            }
+        } else if (e.key === 'v' || e.key === 'V') {
+            setActiveTool('select');
+        } else if (e.key === 'd' || e.key === 'D') {
+            setActiveTool('draw');
+        } else if (e.key === 'r' || e.key === 'R') {
+            setActiveTool('rectangle');
+        } else if (e.key === 'a' || e.key === 'A') {
+            setActiveTool('arrow');
+        } else if (e.key === 't' || e.key === 'T') {
+            setActiveTool('text');
+        } else if (e.key === 'f' || e.key === 'F') {
+            zoomToFit();
+        } else if (e.key === '1') {
+            zoomToActual();
+        }
+    });
+
+    document.addEventListener('keyup', function(e) {
+        if (e.key === ' ') {
+            state.spaceDown = false;
+            if (state.isPanning) endPan();
+            setActiveTool(state.activeTool); // restore drawing mode if needed
+        }
+    });
+
+    // ── Wire up toolbar buttons ──
+    document.querySelectorAll('#tools .tool-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            setActiveTool(btn.dataset.tool);
+        });
+    });
+
+    document.getElementById('btn-undo').addEventListener('click', undo);
+    document.getElementById('btn-delete').addEventListener('click', function() {
+        const active = canvas.getActiveObject();
+        if (active && active !== canvas.item(0)) {
+            canvas.remove(active);
+            canvas.renderAll();
+            pushUndo();
+        }
+    });
+    document.getElementById('btn-fit').addEventListener('click', zoomToFit);
+    document.getElementById('btn-actual').addEventListener('click', zoomToActual);
+    document.getElementById('btn-reject').addEventListener('click', doReject);
+    document.getElementById('btn-accept').addEventListener('click', doAccept);
+
+    // ── Initialize ──
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    initColors();
+    initThicknesses();
+    loadBackgroundImage();
+})();
+</script>
+</body>
+</html>
