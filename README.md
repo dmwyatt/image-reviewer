@@ -4,6 +4,11 @@ Human-in-the-loop image review for AI coding agents. When an agent like [Claude 
 
 The agent gets a clear signal back: exit code `0` (accept) or `1` (reject), plus the path to your annotated image on stdout. No copy-pasting descriptions of what's wrong — just circle it.
 
+> [!WARNING]
+> This project was vibe coded. I guided the architecture and reviewed high-level
+> design decisions, but did not read most of the generated code line-by-line.
+> There are tests, and it works — but caveat emptor.
+
 ![Review UI — an AI-generated landing page loaded for review with annotation toolbar, color palette, and accept/reject controls](https://bloopityseven.fly.dev/9b450e6e-b674-4ac3-b00b-3409a15ef3dc.png)
 
 ![Annotation tools in action — rectangle and arrow annotations highlighting a misaligned CTA button](https://bloopityseven.fly.dev/5352a355-b21e-4d0c-b03b-08e1cdb221c7.png)
