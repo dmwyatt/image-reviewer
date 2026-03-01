@@ -1,0 +1,57 @@
+name: Enforce Exclusive Labels
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Enforce exclusive labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const exclusiveGroups = [
+              {
+                prefix: 'type:',
+                labels: ['type: bug', 'type: feature', 'type: chore', 'type: docs']
+              },
+              {
+                prefix: 'prio:',
+                labels: ['prio: p0', 'prio: p1', 'prio: p2', 'prio: p3']
+              },
+              {
+                prefix: 'size:',
+                labels: ['size: s', 'size: m', 'size: l']
+              },
+              {
+                prefix: 'status:',
+                labels: ['status: triage', 'status: ready', 'status: in progress', 'status: code review', 'status: blocked', 'status: needs info']
+              }
+            ];
+
+            const addedLabel = context.payload.label.name;
+            const issueLabels = context.payload.issue.labels.map(l => l.name);
+
+            // Find which group the added label belongs to
+            const group = exclusiveGroups.find(g => g.labels.includes(addedLabel));
+            if (!group) return;
+
+            // Find conflicting labels (same group, different label)
+            const conflicts = issueLabels.filter(l =>
+              group.labels.includes(l) && l !== addedLabel
+            );
+
+            // Remove conflicting labels
+            for (const label of conflicts) {
+              console.log(`Removing conflicting label: ${label}`);
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: label
+              });
+            }
