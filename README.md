@@ -1,12 +1,22 @@
 # image-reviewer
 
-Desktop image review and annotation tool. Load an image, optionally annotate it (freehand draw, rectangles, arrows, text), then accept or reject it. Designed for human-in-the-loop workflows where visual approval is needed — screenshot verification, generated image review, UI mockup feedback, and more.
+Human-in-the-loop image review for AI coding agents. When an agent like [Claude Code](https://docs.anthropic.com/en/docs/claude-code) generates a screenshot, UI mockup, chart, or any visual artifact, it can shell out to `image-reviewer` to pause and ask you — the human — whether the result looks right. You can annotate directly on the image (draw, rectangles, arrows, text) to show the agent exactly what needs fixing, then accept or reject.
 
-Exits with code `0` (accept) or `1` (reject), printing the annotated image path to stdout if annotations were saved. This makes it easy to integrate into scripts and automation pipelines.
+The agent gets a clear signal back: exit code `0` (accept) or `1` (reject), plus the path to your annotated image on stdout. No copy-pasting descriptions of what's wrong — just circle it.
 
 ![Review UI — image loaded for review with toolbar, color palette, and accept/reject controls](https://bloopityseven.fly.dev/dc291fae-2da3-412e-8c45-abc315a9b960.png)
 
 ![Annotation tools in action — rectangle, arrow, and text annotations on an image](https://bloopityseven.fly.dev/e78e537f-82fe-4f52-bc43-4f1bd87b56ce.png)
+
+### How it fits into an agent workflow
+
+1. Agent generates or captures an image (screenshot, plot, UI render, etc.)
+2. Agent runs `image-reviewer <image>` — this blocks and opens a window for you
+3. You inspect the image, optionally annotate what's wrong (or what looks good)
+4. You click **Accept** or **Reject**
+5. Agent reads the exit code and annotated image, then decides what to do next
+
+A [Claude Code skill](#claude-code-skill) is included so agents already know how to use this tool out of the box.
 
 ## Installation
 
@@ -109,7 +119,7 @@ Both modes use the same HTML/JS frontend and HTTP server internally.
 
 ## Claude Code skill
 
-This project includes a [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skill at `.claude/skills/image-reviewer/SKILL.md` that teaches AI agents how to use this tool for human-in-the-loop image review. The skill covers installation, invocation, fallback behavior, and result interpretation so that agents can present images for user approval during automated workflows.
+The project ships a skill file at `.claude/skills/image-reviewer/SKILL.md`. When this skill is loaded, Claude Code already knows how to install the tool, invoke it, handle native/serve fallback, and interpret the exit code and annotated image — no manual prompting needed.
 
 ## Development
 
