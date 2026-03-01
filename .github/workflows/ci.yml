@@ -69,7 +69,9 @@ jobs:
 
   code-review:
     needs: ci-status
-    if: success() && github.event.pull_request.draft == false
+    if: >
+      success() && github.event.pull_request.draft == false &&
+      contains('OWNER,COLLABORATOR,MEMBER', github.event.pull_request.author_association)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -136,7 +138,9 @@ jobs:
 
   security-review:
     needs: ci-status
-    if: success() && github.event.pull_request.draft == false
+    if: >
+      success() && github.event.pull_request.draft == false &&
+      contains('OWNER,COLLABORATOR,MEMBER', github.event.pull_request.author_association)
     runs-on: ubuntu-latest
     permissions:
       contents: read
