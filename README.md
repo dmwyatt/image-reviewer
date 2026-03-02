@@ -25,17 +25,17 @@ A [Claude Code skill](#claude-code-skill) is included so agents already know how
 
 ## Installation
 
-Requires Python 3.14+.
-
 ```bash
 uv tool install git+https://github.com/dmwyatt/image-reviewer.git
 ```
 
-For native window mode (default), you also need GTK and WebKit libraries. On Ubuntu/Debian:
+On Linux, native window mode (default) requires GTK and WebKit system libraries so that PyGObject can compile. For example, on Ubuntu 24.04:
 
 ```bash
-sudo apt install gir1.2-webkit2-4.1 libgirepository1.0-dev
+sudo apt install libgirepository-2.0-dev gcc libcairo2-dev pkg-config python3-dev gir1.2-gtk-3.0 gir1.2-webkit2-4.1
 ```
+
+Other distros/versions will need equivalent packages. On macOS and Windows, native mode works without additional system dependencies.
 
 If native dependencies aren't available, use `--serve` mode to open the UI in your browser instead.
 
