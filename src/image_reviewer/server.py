@@ -41,6 +41,8 @@ class ReviewHandler(BaseHTTPRequestHandler):
             self._handle_action("accept")
         elif self.path == "/api/reject":
             self._handle_action("reject")
+        elif self.path == "/api/log":
+            self._handle_client_log()
         else:
             self.send_error(404)
 
@@ -58,6 +60,13 @@ class ReviewHandler(BaseHTTPRequestHandler):
         annotated_path = self._save_annotations_if_present()
         self.state.result = ViewerResult(action=action, annotated_path=annotated_path)
         self.state.done_event.set()
+        self._send_json({"status": "ok"})
+
+    def _handle_client_log(self):
+        content_length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(content_length) if content_length else b""
+        data = json.loads(body) if body.strip() else {}
+        _append_debug_log(data.get("message", ""))
         self._send_json({"status": "ok"})
 
     def _save_annotations_if_present(self) -> str | None:
@@ -91,6 +100,14 @@ class ReviewHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
+DEBUG_LOG_PATH = Path("/tmp/image-reviewer-ui.log")
+
+
+def _append_debug_log(message: str) -> None:
+    with open(DEBUG_LOG_PATH, "a") as f:
+        f.write(message + "\n")
+
+
 def _load_asset(name: str) -> str:
     return resources.files("image_reviewer.assets").joinpath(name).read_text("utf-8")
 
@@ -108,6 +125,7 @@ def run_server(
     image_path: Path, output_path: Path, port: int = 0
 ) -> tuple[HTTPServer, int, ServerState]:
     state = ServerState(image_path=image_path, output_path=output_path)
+    DEBUG_LOG_PATH.unlink(missing_ok=True)
     handler_class = make_handler(state)
     server = HTTPServer(("127.0.0.1", port), handler_class)
     actual_port = server.server_address[1]
