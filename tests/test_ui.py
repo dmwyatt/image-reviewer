@@ -216,6 +216,39 @@ class TestAnnotations:
         page.keyboard.type("Hello")
         page.wait_for_timeout(200)
 
+    def test_text_tool_space_continues_editing(self, ui_page):
+        """Pressing space while editing text should insert a space, not exit editing.
+
+        Regression test: space keyup was calling setActiveTool() which ran
+        discardActiveObject(), kicking the user out of text editing mode.
+        """
+        page, state, _, _ = ui_page
+        page.click('[data-tool="text"]')
+        canvas = page.locator("#canvas-container")
+        box = canvas.bounding_box()
+        cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        page.mouse.click(cx, cy)
+        page.wait_for_timeout(300)
+        # Fabric.js creates a hidden textarea for IText editing
+        textarea = page.locator("textarea")
+        expect(textarea).to_have_count(1)
+        # Use individual key presses (closer to real user behavior)
+        page.keyboard.type("Hello")
+        page.keyboard.down("Space")
+        page.wait_for_timeout(50)
+        page.keyboard.up("Space")
+        page.wait_for_timeout(100)
+        # The textarea should still exist and be focused (still in editing mode)
+        expect(textarea).to_have_count(1)
+        is_focused = page.evaluate(
+            "() => document.activeElement === document.querySelector('textarea')"
+        )
+        assert is_focused, "Textarea lost focus after pressing space"
+        page.keyboard.type("World")
+        page.wait_for_timeout(200)
+        # Verify the textarea contains the full text including the space
+        assert textarea.input_value() == "Hello World"
+
 
 class TestZoom:
     def test_zoom_display_shows_percentage(self, ui_page):

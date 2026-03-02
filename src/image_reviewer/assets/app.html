@@ -693,6 +693,7 @@ body {
     });
 
     document.addEventListener('keyup', function(e) {
+        if (isEditingText()) return;
         if (e.key === ' ') {
             state.spaceDown = false;
             if (state.isPanning) endPan();
