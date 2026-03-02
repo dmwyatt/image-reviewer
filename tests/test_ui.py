@@ -11,13 +11,10 @@ from playwright.sync_api import Page, expect
 from image_reviewer.server import run_server
 
 
-def _create_test_png(directory: Path) -> Path:
-    """Create a 200x200 red square PNG for UI testing."""
-    # Build a minimal but visible PNG manually
+def _create_test_png(directory: Path, width: int = 200, height: int = 200) -> Path:
+    """Create a solid red PNG of the given dimensions for UI testing."""
     import struct
     import zlib
-
-    width, height = 200, 200
 
     def make_chunk(chunk_type, data):
         chunk = chunk_type + data
@@ -283,3 +280,75 @@ class TestUndo:
         page.wait_for_timeout(200)
         page.keyboard.press("Control+z")
         page.wait_for_timeout(200)
+
+
+@pytest.fixture
+def large_image_server(ui_tmp_dir: Path):
+    """Start the server with a large (2000x1500) test image."""
+    image_path = _create_test_png(ui_tmp_dir, width=2000, height=1500)
+    output_path = ui_tmp_dir / "annotated.png"
+    server, port, state = run_server(image_path, output_path)
+    yield port, state, output_path
+    server.shutdown()
+
+
+@pytest.fixture
+def large_image_page(page: Page, large_image_server):
+    """Navigate to the UI server with a large image and wait for canvas."""
+    port, state, output_path = large_image_server
+    page.goto(f"http://127.0.0.1:{port}/")
+    page.wait_for_selector("#canvas")
+    page.wait_for_timeout(500)
+    return page, state, output_path, port
+
+
+class TestAnnotationScaling:
+    def test_text_font_size_scales_with_image_size(self, large_image_page):
+        page, *_ = large_image_page
+        page.click('[data-tool="text"]')
+        canvas = page.locator("#canvas-container")
+        box = canvas.bounding_box()
+        cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        page.mouse.click(cx, cy)
+        page.wait_for_timeout(300)
+
+        # The base fontSize at thickness=4 would be 16 + 4*2 = 24.
+        # With a 2000px image, scale = 2000/1000 = 2, so fontSize = 24*2 = 48.
+        font_size = page.evaluate(
+            "() => document.querySelector('#canvas')"
+            ".__fabric_canvas.getObjects().find(o => o.type === 'i-text').fontSize"
+        )
+        base_font_size = 16 + 4 * 2  # 24 at default thickness=4
+        assert font_size > base_font_size
+
+    def test_rectangle_stroke_width_scales(self, large_image_page):
+        page, *_ = large_image_page
+        page.click('[data-tool="rectangle"]')
+        canvas = page.locator("#canvas-container")
+        box = canvas.bounding_box()
+        cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        page.mouse.move(cx - 40, cy - 40)
+        page.mouse.down()
+        page.mouse.move(cx + 40, cy + 40, steps=5)
+        page.mouse.up()
+        page.wait_for_timeout(300)
+
+        # Default thickness = 4, scale = 2000/1000 = 2, so strokeWidth = 8
+        stroke_width = page.evaluate(
+            "() => document.querySelector('#canvas')"
+            ".__fabric_canvas.getObjects().find(o => o.type === 'rect').strokeWidth"
+        )
+        base_thickness = 4  # default
+        assert stroke_width > base_thickness
+
+    def test_freehand_brush_width_scales(self, large_image_page):
+        page, *_ = large_image_page
+        page.click('[data-tool="draw"]')
+        page.wait_for_timeout(100)
+
+        # Default thickness = 4, scale = 2000/1000 = 2, so brush width = 8
+        brush_width = page.evaluate(
+            "() => document.querySelector('#canvas').__fabric_canvas.freeDrawingBrush.width"
+        )
+        base_thickness = 4  # default
+        assert brush_width > base_thickness

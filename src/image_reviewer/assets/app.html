@@ -242,6 +242,8 @@ body {
         selection: true,
         preserveObjectStacking: true,
     });
+    // Expose canvas instance for test access
+    document.getElementById('canvas').__fabric_canvas = canvas;
 
     function resizeCanvas() {
         canvas.setWidth(container.clientWidth);
@@ -330,6 +332,12 @@ body {
         updateCursor();
     }
 
+    // ── Annotation Scaling ──
+    function getAnnotationScale() {
+        const REF = 1000;
+        return Math.max(state.imageWidth || REF, state.imageHeight || REF) / REF;
+    }
+
     // ── Tool Management ──
     function setActiveTool(tool) {
         state.activeTool = tool;
@@ -340,7 +348,7 @@ body {
         canvas.selection = (tool === 'select');
         if (tool === 'draw') {
             canvas.freeDrawingBrush.color = state.activeColor;
-            canvas.freeDrawingBrush.width = state.activeThickness;
+            canvas.freeDrawingBrush.width = Math.max(1, state.activeThickness * getAnnotationScale());
         }
         canvas.forEachObject(function(obj) {
             if (obj === canvas.item(0)) return; // background image
@@ -385,7 +393,7 @@ body {
                 height: 0,
                 fill: 'transparent',
                 stroke: state.activeColor,
-                strokeWidth: state.activeThickness,
+                strokeWidth: Math.max(1, state.activeThickness * getAnnotationScale()),
                 selectable: false,
                 evented: false,
             });
@@ -402,7 +410,7 @@ body {
                 left: pointer.x,
                 top: pointer.y,
                 fontFamily: 'Arial',
-                fontSize: 16 + state.activeThickness * 2,
+                fontSize: Math.max(10, (16 + state.activeThickness * 2) * getAnnotationScale()),
                 fill: state.activeColor,
                 selectable: true,
                 evented: true,
@@ -473,16 +481,17 @@ body {
 
     // ── Arrow Tool ──
     function createArrow(x1, y1, x2, y2) {
+        const scaledWidth = Math.max(1, state.activeThickness * getAnnotationScale());
         const line = new fabric.Line([x1, y1, x2, y2], {
             stroke: state.activeColor,
-            strokeWidth: state.activeThickness,
+            strokeWidth: scaledWidth,
             selectable: false,
             evented: false,
             objectCaching: false,
         });
         line.isArrow = true;
         line._arrowColor = state.activeColor;
-        line._arrowWidth = state.activeThickness;
+        line._arrowWidth = scaledWidth;
         return line;
     }
 
@@ -584,7 +593,7 @@ body {
                     b.classList.toggle('active', parseInt(b.dataset.thickness) === t);
                 });
                 if (canvas.isDrawingMode) {
-                    canvas.freeDrawingBrush.width = t;
+                    canvas.freeDrawingBrush.width = Math.max(1, t * getAnnotationScale());
                 }
             });
             container.appendChild(btn);
